@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "allowImportingTsExtensions": true,
+        "noEmit": true,
+        "forceConsistentCasingInFileNames": true,
+        "module": "CommonJS",
+        "outDir": "dist",
+        "esModuleInterop": true,
+        "strict": true
+    },
+    "include": [
+        "electron"
+    ]
+}

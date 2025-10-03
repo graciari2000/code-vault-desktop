@@ -1,0 +1,80 @@
+{
+  "name": "code-vault-desktop",
+  "version": "0.1.0",
+  "description": "AI-powered code snippet manager and productivity tool",
+  "author": "graciari2000",
+  "private": true,
+  "main": "dist/main.js",
+  "homepage": "./",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
+    "dev:renderer": "cd renderer && vite",
+    "dev:electron": "tsc -p tsconfig.main.json && electron .",
+    "build": "npm run build:renderer && npm run build:main && electron-builder",
+    "build:renderer": "cd renderer && vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "start": "electron .",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.codevault.desktop",
+    "productName": "Code Vault",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "renderer/dist/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "graciari2000",
+        "repo": "code-vault-desktop"
+      }
+    ]
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "lucide-react": "^0.263.1",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.0.0",
+    "sqlite3": "^5.1.6",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@types/uuid": "^9.0.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^8.2.0",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.0.0",
+    "typescript": "^5.9.2",
+    "vite": "^5.0.0",
+    "wait-on": "^7.0.1"
+  }
+}

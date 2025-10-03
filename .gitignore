@@ -1,0 +1,35 @@
+# Node modules
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite / React build outputs
+renderer/dist/
+dist/
+release/
+
+# Electron build output
+dist_electron/
+
+# TypeScript build outputs
+dist/
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (sensitive)
+.env
+.env.local
+.env.*.local
+
+# VS Code settings
+.vscode/
+
+# Optional: JetBrains IDE settings
+.idea/
