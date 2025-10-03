@@ -29,6 +29,13 @@
       "package.json",
       "node_modules/**/*"
     ],
+    "extraFiles": [
+      {
+        "from": "node_modules/ffmpeg-static/bin/win32/ffmpeg.exe",
+        "to": "ffmpeg.exe",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": [
         "nsis"
