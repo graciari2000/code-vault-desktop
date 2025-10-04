@@ -1,6 +1,6 @@
 {
   "name": "code-vault-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-powered code snippet manager and productivity tool",
   "author": "graciari2000",
   "private": true,
@@ -33,7 +33,9 @@
       {
         "from": "node_modules/ffmpeg-static/bin/win32/ffmpeg.exe",
         "to": "ffmpeg.exe",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -73,11 +75,11 @@
   },
   "dependencies": {
     "axios": "^1.4.0",
+    "better-sqlite3": "^12.4.1",
     "lucide-react": "^0.263.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
-    "sqlite3": "^5.1.7",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
