@@ -1,0 +1,108 @@
+{
+  "name": "code-vault",
+  "displayName": "Code Vault",
+  "description": "AI-powered code snippet suggestions from your personal code library",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeVault.showSnippets",
+        "title": "Code Vault: Show Relevant Snippets",
+        "category": "Code Vault"
+      },
+      {
+        "command": "codeVault.captureCode",
+        "title": "Code Vault: Capture Current Code",
+        "category": "Code Vault"
+      },
+      {
+        "command": "codeVault.checkStatus",
+        "title": "Code Vault: Check Extension Status",
+        "category": "Code Vault"
+      },
+      {
+        "command": "codeVault.refreshCache",
+        "title": "Code Vault: Refresh Snippet Cache",
+        "category": "Code Vault"
+      }
+    ],
+    "configuration": {
+      "title": "Code Vault",
+      "properties": {
+        "codeVault.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8802",
+          "description": "Code Vault desktop app server URL"
+        },
+        "codeVault.autoSuggest": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic snippet suggestions"
+        },
+        "codeVault.autoCapture": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically capture code while you work"
+        },
+        "codeVault.captureOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Capture code when files are saved"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "codeVault.showSnippets",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeVault.captureCode",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeVault.captureCode",
+          "group": "codeVault@1"
+        },
+        {
+          "command": "codeVault.showSnippets",
+          "group": "codeVault@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "axios": "^1.4.0"
+  },
+  "publisher": "AnnStudios",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ann-studios/code-vault"
+  }
+}
