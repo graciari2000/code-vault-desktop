@@ -3,6 +3,11 @@ import axios from 'axios'
 import { Search, Plus, Moon, Sun, Code, Tag, Calendar, Brain, Sparkles, Zap, Copy, X } from 'lucide-react'
 import './styles.css'
 
+// Environment-based URL configuration
+const API_BASE_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:8802'
+  : 'https://code-vault-desktop.onrender.com'
+
 interface Snippet {
   id: string
   title: string
@@ -56,6 +61,9 @@ export default function App() {
     loadSnippets()
     const savedTheme = localStorage.getItem('theme')
     setIsDark(savedTheme === 'dark')
+
+    // Test server connection
+    testConnection()
   }, [])
 
   useEffect(() => {
@@ -67,9 +75,19 @@ export default function App() {
     filterSnippets()
   }, [snippets, query, selectedLanguage, selectedTag])
 
+  const testConnection = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/health`)
+      console.log('Server connection successful:', res.data)
+    } catch (error) {
+      console.error('Cannot connect to server:', error)
+      alert(`Cannot connect to server at ${API_BASE_URL}. Please make sure the backend is running.`)
+    }
+  }
+
   const loadSnippets = async () => {
     try {
-      const res = await axios.get('https://code-vault-desktop.onrender.com/api/snippets')
+      const res = await axios.get(`${API_BASE_URL}/api/snippets`)
       setSnippets(res.data)
     } catch (error) {
       console.error('Failed to load snippets:', error)
@@ -86,7 +104,7 @@ export default function App() {
     setIsAnalyzing(true)
     try {
       // Try server-side AI analysis first
-      const response = await axios.post('https://code-vault-desktop.onrender.com/api/ai/analyze', {
+      const response = await axios.post(`${API_BASE_URL}/api/ai/analyze`, {
         code,
         language: 'auto'
       })
@@ -227,7 +245,7 @@ export default function App() {
         id: Date.now().toString(),
         createdAt: new Date().toISOString()
       }
-      const res = await axios.post('https://code-vault-desktop.onrender.com/api/snippets', snippetToAdd)
+      const res = await axios.post(`${API_BASE_URL}/api/snippets`, snippetToAdd)
       setSnippets(prev => [...prev, res.data])
       setShowAddForm(false)
       setNewSnippet({
