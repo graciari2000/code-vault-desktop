@@ -3,10 +3,15 @@ import axios from 'axios'
 import { Search, Plus, Moon, Sun, Code, Tag, Calendar, Brain, Sparkles, Zap, Copy, X } from 'lucide-react'
 import './styles.css'
 
-// Environment-based URL configuration
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8802'
-  : 'https://code-vault-desktop.onrender.com'
+// Use Vite environment variables for API configuration
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://code-vault-desktop.onrender.com';
+
+// Debug info
+console.log('🚀 Frontend Configuration:');
+console.log('Hostname:', window.location.hostname);
+console.log('API Base URL:', API_BASE_URL);
+console.log('Environment Mode:', import.meta.env.MODE);
+console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
 
 interface Snippet {
   id: string
