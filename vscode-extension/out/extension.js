@@ -38,7 +38,7 @@ function activate(context) {
     console.log('🎯 Code Vault extension activating...');
     isExtensionActive = true;
     const config = vscode.workspace.getConfiguration('codeVault');
-    const serverUrl = config.get('serverUrl', 'http://localhost:8802');
+    const serverUrl = config.get('serverUrl', 'http://code-vault-desktop.onrender.com');
     const autoCapture = config.get('autoCapture', true);
     const captureOnSave = config.get('captureOnSave', true);
     console.log(`🔧 Extension configuration:`, {
