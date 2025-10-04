@@ -2,7 +2,7 @@
   "name": "code-vault",
   "displayName": "Code Vault",
   "description": "AI-powered code snippet suggestions from your personal code library",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -40,22 +40,22 @@
         "codeVault.serverUrl": {
           "type": "string",
           "default": "http://localhost:8802",
-          "description": "Code Vault desktop app server URL"
-        },
-        "codeVault.autoSuggest": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable automatic snippet suggestions"
+          "description": "URL of the Code Vault desktop app backend server"
         },
         "codeVault.autoCapture": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically capture code while you work"
+          "description": "Automatically capture code selections and file saves"
         },
         "codeVault.captureOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Capture code when files are saved"
+          "description": "Capture entire files when they are saved"
+        },
+        "codeVault.autoSuggest": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show automatic snippet suggestions (future feature)"
         }
       }
     },
@@ -77,11 +77,27 @@
       "editor/context": [
         {
           "command": "codeVault.captureCode",
-          "group": "codeVault@1"
+          "group": "codeVault@1",
+          "when": "editorHasSelection"
         },
         {
           "command": "codeVault.showSnippets",
-          "group": "codeVault@2"
+          "group": "codeVault@2",
+          "when": "editorTextFocus"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codeVault.showSnippets"
+        },
+        {
+          "command": "codeVault.captureCode"
+        },
+        {
+          "command": "codeVault.checkStatus"
+        },
+        {
+          "command": "codeVault.refreshCache"
         }
       ]
     }
@@ -103,6 +119,14 @@
   "publisher": "AnnStudios",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ann-studios/code-vault"
-  }
+    "url": "https://github.com/graciari2000/code-vault-desktop"
+  },
+  "icon": "assets/code-vault-logo.png",
+  "keywords": [
+    "code",
+    "snippets",
+    "productivity",
+    "ai",
+    "code-suggestions"
+  ]
 }

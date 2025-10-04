@@ -88,6 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (!editor.selection.isEmpty) {
       console.log('🔍 Code Vault: Selection capture triggered');
       await captureSelectionOnly(editor, serverUrl);
+      lastCaptureTime = Date.now();
     }
   });
 
@@ -137,7 +138,6 @@ async function captureSelectionOnly(editor: vscode.TextEditor, serverUrl: string
 
     if (codeToCapture && codeToCapture.length > 20) {
       await processCodeCapture(codeToCapture, document.languageId, title, serverUrl, false);
-      const lastCaptureTime = Date.now();
     }
   } catch (error) {
     console.error('❌ Selection capture error:', error);
@@ -187,28 +187,32 @@ async function loadExistingSnippets(serverUrl: string): Promise<void> {
     console.log(`📚 Loaded ${existingSnippetsCache.length} existing snippets into cache`);
   } catch (error) {
     console.error('❌ Failed to load existing snippets:', error);
+    // Don't show error to user here - it might just be that the app isn't running yet
   }
 }
 
 async function testServerConnection(serverUrl: string) {
   try {
     const response = await axios.get(`${serverUrl}/api/health`, { timeout: 5000 });
-    console.log('✅ Server connection test:', response.data);
+    console.log('✅ Connected to Code Vault desktop app:', response.data);
     return true;
   } catch (error) {
-    console.error('❌ Server connection failed:', error);
+    console.error('❌ Cannot connect to Code Vault desktop app:', error);
     vscode.window.showErrorMessage(
-      `Code Vault: Cannot connect to server at ${serverUrl}. Make sure the desktop app is running.`
+      `Code Vault: Cannot connect to desktop app at ${serverUrl}. ` +
+      `Make sure the Code Vault desktop app is running. ` +
+      `If using a different port, update the "codeVault.serverUrl" setting in VS Code settings.`
     );
     return false;
   }
 }
 
 async function checkExtensionStatus(serverUrl: string) {
+  const serverReachable = await testServerConnection(serverUrl);
   const status = {
     extensionActive: isExtensionActive,
     serverUrl,
-    serverReachable: await testServerConnection(serverUrl),
+    serverReachable,
     cachedSnippets: existingSnippetsCache.length,
     recentlyProcessed: recentlyProcessed.size,
     commands: ['codeVault.showSnippets', 'codeVault.captureCode', 'codeVault.checkStatus', 'codeVault.refreshCache']
@@ -216,11 +220,15 @@ async function checkExtensionStatus(serverUrl: string) {
 
   console.log('🔧 Extension Status:', status);
   
-  vscode.window.showInformationMessage(
-    `Code Vault Status: ${status.extensionActive ? 'Active' : 'Inactive'}, ` +
-    `Server: ${status.serverReachable ? 'Connected' : 'Disconnected'}, ` +
-    `Cached: ${status.cachedSnippets} snippets`
-  );
+  if (serverReachable) {
+    vscode.window.showInformationMessage(
+      `✅ Code Vault: Connected to desktop app, ${existingSnippetsCache.length} snippets cached`
+    );
+  } else {
+    vscode.window.showWarningMessage(
+      `❌ Code Vault: Desktop app not found at ${serverUrl}. Make sure the Code Vault app is running.`
+    );
+  }
 }
 
 async function isCodeAlreadyInVault(code: string, serverUrl: string): Promise<boolean> {
@@ -247,7 +255,7 @@ async function isCodeAlreadyInVault(code: string, serverUrl: string): Promise<bo
     try {
       const response = await axios.post(`${serverUrl}/api/ai/analyze`, {
         code,
-        checkDuplicates: true
+        language: 'auto'
       }, { timeout: 10000 });
 
       // If server finds very similar code, consider it a duplicate
@@ -360,6 +368,13 @@ async function captureCurrentCode(serverUrl: string) {
     prompt: 'Code Description (optional)'
   });
 
+  console.log('📝 Final snippet data:', {
+    title,
+    description,
+    language: document.languageId,
+    codeLength: codeToCapture.length
+  });
+
   await saveSnippetToVault(codeToCapture, document.languageId, title, serverUrl, description);
 }
 
@@ -379,28 +394,57 @@ async function saveSnippetToVault(code: string, language: string, title: string,
     recentlyProcessed.add(codeHash);
     setTimeout(() => recentlyProcessed.delete(codeHash), 60000); // Remove after 1 minute
 
-    const snippet: Partial<Snippet> = {
-      title,
-      code,
+    // Create the snippet data exactly as the backend expects it
+    const snippetData = {
+      title: title || `Code from ${new Date().toLocaleString()}`,
+      code: code,
       language: mapLanguageId(language),
-      description,
+      description: description || '',
       tags: ['auto-captured', 'vscode']
+      // Don't include id or createdAt - let the backend handle this
     };
 
-    console.log('📤 Sending snippet to server:', { title, language: snippet.language, length: code.length });
+    console.log('📤 Sending snippet to desktop app:', { 
+      title: snippetData.title, 
+      language: snippetData.language, 
+      length: code.length 
+    });
     
-    const response = await axios.post(`${serverUrl}/api/snippets`, snippet, { timeout: 10000 });
+    const response = await axios.post(`${serverUrl}/api/snippets`, snippetData, { 
+      timeout: 10000 
+    });
     
     // Update cache with new snippet
-    existingSnippetsCache.unshift(response.data);
+    if (response.data && response.data.id) {
+      existingSnippetsCache.unshift(response.data);
+      console.log('✅ Snippet saved successfully to desktop app:', response.data.id);
+      vscode.window.showInformationMessage(`💾 Code Vault: "${title}" saved successfully!`);
+    } else {
+      console.error('❌ Invalid response from server:', response.data);
+      vscode.window.showErrorMessage('Failed to save snippet - invalid server response');
+    }
     
-    console.log('✅ Snippet saved successfully:', response.data);
-    vscode.window.showInformationMessage(`💾 Code Vault: "${title}" saved successfully!`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Failed to save snippet to Code Vault:', error);
-    vscode.window.showErrorMessage(
-      `Failed to save code to Code Vault. Make sure the desktop app is running at ${serverUrl}`
-    );
+    
+    // Show more detailed error message
+    if (error.response) {
+      // Server responded with error status
+      console.error('Server error response:', error.response.data);
+      vscode.window.showErrorMessage(
+        `Failed to save code: ${error.response.data.error || 'Server error'}`
+      );
+    } else if (error.request) {
+      // No response received
+      vscode.window.showErrorMessage(
+        `Cannot connect to Code Vault desktop app at ${serverUrl}. Make sure it's running.`
+      );
+    } else {
+      // Other error
+      vscode.window.showErrorMessage(
+        `Failed to save code: ${error.message}`
+      );
+    }
   }
 }
 
