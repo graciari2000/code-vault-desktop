@@ -2,7 +2,7 @@
   "name": "code-vault",
   "displayName": "Code Vault",
   "description": "AI-powered code snippet suggestions from your personal code library",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "engines": {
     "vscode": "^1.74.0"
   },
