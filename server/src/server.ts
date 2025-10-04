@@ -1,197 +1,369 @@
 import express from 'express';
 import cors from 'cors';
+import { MongoClient, ObjectId, ServerApiVersion } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import Database from 'better-sqlite3';
-// Add these imports at the top
-import { createHash } from 'crypto';
 
 const app = express();
-const PORT = 8802;
+const PORT = process.env.PORT || 8802;
 
-app.use(cors());
-app.use(express.json());
+// MongoDB Atlas connection string - using your provided URL
+const MONGODB_URI = 'mongodb+srv://kafuiakakpo1_db_user:EbkL3KWwU739hPIz@cluster0.wlxpplo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
-// Database setup
-const db = new Database('code-vault.db');
+// MongoDB client setup
+const client = new MongoClient(MONGODB_URI, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
 
-// Define types
-interface SnippetRow {
-  id: string;
-  title: string;
-  code: string;
-  language: string;
-  description: string | null;
-  tags: string | null;
-  created_at: string;
+// Database and collection references
+let db: any;
+let snippetsCollection: any;
+
+// Connect to MongoDB
+async function connectToDatabase() {
+  try {
+    await client.connect();
+    db = client.db('codevault');
+    snippetsCollection = db.collection('snippets');
+    console.log('✅ Connected to MongoDB Atlas');
+    
+    // Create indexes for better performance
+    await snippetsCollection.createIndex({ title: 'text', code: 'text', description: 'text' });
+    await snippetsCollection.createIndex({ language: 1 });
+    await snippetsCollection.createIndex({ tags: 1 });
+    await snippetsCollection.createIndex({ createdAt: -1 });
+    
+    // Insert sample data if collection is empty
+    const snippetCount = await snippetsCollection.countDocuments();
+    if (snippetCount === 0) {
+      await insertSampleData();
+    }
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    process.exit(1);
+  }
 }
 
-interface Snippet {
-  id: string;
-  title: string;
-  code: string;
-  language: string;
-  description?: string;
-  tags: string[];
-  createdAt: string;
-}
-
-// Initialize database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS snippets (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    code TEXT NOT NULL,
-    language TEXT NOT NULL,
-    description TEXT,
-    tags TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-// Insert sample data if empty
-const snippetCount = db.prepare('SELECT COUNT(*) as count FROM snippets').get() as { count: number };
-if (snippetCount.count === 0) {
-  const insertSnippet = db.prepare(`
-    INSERT INTO snippets (id, title, code, language, description, tags)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
+// Insert sample data
+async function insertSampleData() {
   const sampleSnippets = [
     {
-      id: uuidv4(),
+      _id: new ObjectId(),
       title: 'React Hook Form Setup',
       code: `const { register, handleSubmit, formState: { errors } } = useForm();\nconst onSubmit = data => console.log(data);`,
       language: 'typescript',
       description: 'Basic setup for React Hook Form with TypeScript',
-      tags: JSON.stringify(['react', 'form', 'hook'])
+      tags: ['react', 'form', 'hook'],
+      createdAt: new Date()
     },
     {
-      id: uuidv4(),
+      _id: new ObjectId(),
       title: 'API Fetch Wrapper',
       code: `async function apiFetch(url, options = {}) {\n  const response = await fetch(url, {\n    headers: { 'Content-Type': 'application/json' },\n    ...options\n  });\n  return response.json();\n}`,
       language: 'javascript',
       description: 'Generic fetch wrapper for API calls',
-      tags: JSON.stringify(['api', 'utility', 'http'])
+      tags: ['api', 'utility', 'http'],
+      createdAt: new Date()
+    },
+    {
+      _id: new ObjectId(),
+      title: 'Express Server Setup',
+      code: `const express = require('express');\nconst app = express();\napp.use(express.json());\napp.listen(3000, () => console.log('Server running'));`,
+      language: 'javascript',
+      description: 'Basic Express.js server setup',
+      tags: ['express', 'server', 'nodejs'],
+      createdAt: new Date()
+    },
+    {
+      _id: new ObjectId(),
+      title: 'Python Flask API',
+      code: `from flask import Flask, jsonify\napp = Flask(__name__)\n\n@app.route('/api/data')\ndef get_data():\n    return jsonify({"message": "Hello World"})\n\nif __name__ == '__main__':\n    app.run(debug=True)`,
+      language: 'python',
+      description: 'Simple Flask API endpoint',
+      tags: ['python', 'flask', 'api'],
+      createdAt: new Date()
     }
   ];
 
-  sampleSnippets.forEach(snippet => {
-    insertSnippet.run(
-      snippet.id,
-      snippet.title,
-      snippet.code,
-      snippet.language,
-      snippet.description,
-      snippet.tags
-    );
-  });
+  try {
+    await snippetsCollection.insertMany(sampleSnippets);
+    console.log('✅ Sample data inserted');
+  } catch (error) {
+    console.error('Error inserting sample data:', error);
+  }
 }
 
+// Middleware
+app.use(cors({
+  origin: [
+    'https://code-vault-desktop.vercel.app', // Your Vercel frontend
+    'http://localhost:5173', // Vite dev server
+    'http://localhost:3000' // React dev server
+  ],
+  credentials: true
+}));
+app.use(express.json());
+
 // Routes
-app.get('/api/snippets', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM snippets ORDER BY created_at DESC').all() as SnippetRow[];
+    // Test database connection
+    await db.command({ ping: 1 });
+    const snippetCount = await snippetsCollection.countDocuments();
     
-    const snippets: Snippet[] = rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      code: row.code,
-      language: row.language,
-      description: row.description || undefined,
-      tags: row.tags ? JSON.parse(row.tags) : [],
-      createdAt: row.created_at
+    res.json({ 
+      status: 'OK', 
+      message: 'Code Vault server is running with MongoDB Atlas',
+      database: 'Connected to MongoDB Atlas',
+      totalSnippets: snippetCount,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'Error', 
+      message: 'Database connection failed',
+      error: error.message 
+    });
+  }
+});
+
+// Get all snippets
+app.get('/api/snippets', async (req, res) => {
+  try {
+    const { search, language, tag, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    
+    let query = {};
+    
+    // Search across multiple fields
+    if (search) {
+      query = {
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { code: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { tags: { $in: [new RegExp(search, 'i')] } }
+        ]
+      };
+    }
+    
+    // Filter by language
+    if (language && language !== 'all') {
+      query.language = language;
+    }
+    
+    // Filter by tag
+    if (tag && tag !== 'all') {
+      query.tags = tag;
+    }
+    
+    // Sort configuration
+    const sortOptions: any = {};
+    sortOptions[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
+    
+    const snippets = await snippetsCollection
+      .find(query)
+      .sort(sortOptions)
+      .toArray();
+    
+    // Convert MongoDB _id to id for frontend compatibility
+    const formattedSnippets = snippets.map(snippet => ({
+      id: snippet._id.toString(),
+      title: snippet.title,
+      code: snippet.code,
+      language: snippet.language,
+      description: snippet.description,
+      tags: snippet.tags || [],
+      createdAt: snippet.createdAt.toISOString()
     }));
     
-    res.json(snippets);
+    res.json(formattedSnippets);
   } catch (error) {
     console.error('Error fetching snippets:', error);
     res.status(500).json({ error: 'Failed to fetch snippets' });
   }
 });
 
-app.post('/api/snippets', (req, res) => {
+// Get single snippet by ID
+app.get('/api/snippets/:id', async (req, res) => {
   try {
-    const { title, code, language, description, tags } = req.body;
-    const id = uuidv4();
+    const { id } = req.params;
     
-    const insertStmt = db.prepare(`
-      INSERT INTO snippets (id, title, code, language, description, tags)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid snippet ID' });
+    }
     
-    insertStmt.run(
-      id,
-      title,
-      code,
-      language,
-      description || null,
-      JSON.stringify(tags || [])
-    );
+    const snippet = await snippetsCollection.findOne({ _id: new ObjectId(id) });
     
-    const snippet: Snippet = {
-      id,
-      title,
-      code,
-      language,
-      description,
-      tags: tags || [],
-      createdAt: new Date().toISOString()
+    if (!snippet) {
+      return res.status(404).json({ error: 'Snippet not found' });
+    }
+    
+    // Convert MongoDB _id to id
+    const formattedSnippet = {
+      id: snippet._id.toString(),
+      title: snippet.title,
+      code: snippet.code,
+      language: snippet.language,
+      description: snippet.description,
+      tags: snippet.tags || [],
+      createdAt: snippet.createdAt.toISOString()
     };
     
-    res.json(snippet);
+    res.json(formattedSnippet);
+  } catch (error) {
+    console.error('Error fetching snippet:', error);
+    res.status(500).json({ error: 'Failed to fetch snippet' });
+  }
+});
+
+// Create new snippet
+app.post('/api/snippets', async (req, res) => {
+  try {
+    const { title, code, language, description, tags } = req.body;
+    
+    if (!title || !code || !language) {
+      return res.status(400).json({ error: 'Title, code, and language are required' });
+    }
+    
+    const newSnippet = {
+      title,
+      code,
+      language,
+      description: description || '',
+      tags: tags || [],
+      createdAt: new Date()
+    };
+    
+    const result = await snippetsCollection.insertOne(newSnippet);
+    
+    const createdSnippet = {
+      id: result.insertedId.toString(),
+      ...newSnippet,
+      createdAt: newSnippet.createdAt.toISOString()
+    };
+    
+    res.status(201).json(createdSnippet);
   } catch (error) {
     console.error('Error creating snippet:', error);
     res.status(500).json({ error: 'Failed to create snippet' });
   }
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Code Vault server is running' });
+// Update snippet
+app.put('/api/snippets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, code, language, description, tags } = req.body;
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid snippet ID' });
+    }
+    
+    if (!title || !code || !language) {
+      return res.status(400).json({ error: 'Title, code, and language are required' });
+    }
+    
+    const updateData = {
+      title,
+      code,
+      language,
+      description: description || '',
+      tags: tags || [],
+      updatedAt: new Date()
+    };
+    
+    const result = await snippetsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Snippet not found' });
+    }
+    
+    const updatedSnippet = await snippetsCollection.findOne({ _id: new ObjectId(id) });
+    
+    res.json({
+      id: updatedSnippet._id.toString(),
+      title: updatedSnippet.title,
+      code: updatedSnippet.code,
+      language: updatedSnippet.language,
+      description: updatedSnippet.description,
+      tags: updatedSnippet.tags,
+      createdAt: updatedSnippet.createdAt.toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating snippet:', error);
+    res.status(500).json({ error: 'Failed to update snippet' });
+  }
 });
 
-// Search endpoint
-app.get('/api/snippets/search', (req, res) => {
+// Delete snippet
+app.delete('/api/snippets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid snippet ID' });
+    }
+    
+    const result = await snippetsCollection.deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Snippet not found' });
+    }
+    
+    res.json({ message: 'Snippet deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting snippet:', error);
+    res.status(500).json({ error: 'Failed to delete snippet' });
+  }
+});
+
+// Search snippets
+app.get('/api/snippets/search', async (req, res) => {
   try {
     const { q } = req.query;
     
     if (!q || typeof q !== 'string') {
-      res.status(400).json({ error: 'Query parameter "q" is required' });
-      return;
+      return res.status(400).json({ error: 'Query parameter "q" is required' });
     }
-
-    const searchStmt = db.prepare(`
-      SELECT * FROM snippets 
-      WHERE title LIKE ? OR code LIKE ? OR description LIKE ? OR tags LIKE ?
-      ORDER BY created_at DESC
-    `);
     
-    const searchTerm = `%${q}%`;
-    const rows = searchStmt.all(searchTerm, searchTerm, searchTerm, searchTerm) as SnippetRow[];
+    const query = {
+      $or: [
+        { title: { $regex: q, $options: 'i' } },
+        { code: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { tags: { $in: [new RegExp(q, 'i')] } }
+      ]
+    };
     
-    const snippets: Snippet[] = rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      code: row.code,
-      language: row.language,
-      description: row.description || undefined,
-      tags: row.tags ? JSON.parse(row.tags) : [],
-      createdAt: row.created_at
+    const snippets = await snippetsCollection
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    const formattedSnippets = snippets.map(snippet => ({
+      id: snippet._id.toString(),
+      title: snippet.title,
+      code: snippet.code,
+      language: snippet.language,
+      description: snippet.description,
+      tags: snippet.tags || [],
+      createdAt: snippet.createdAt.toISOString()
     }));
     
-    res.json(snippets);
+    res.json(formattedSnippets);
   } catch (error) {
     console.error('Error searching snippets:', error);
     res.status(500).json({ error: 'Failed to search snippets' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Code Vault server running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`💾 Database: code-vault.db`);
-});
-
-// Add AI analysis endpoint
+// AI Analysis endpoint
 app.post('/api/ai/analyze', async (req, res) => {
   try {
     const { code, language } = req.body;
@@ -201,19 +373,23 @@ app.post('/api/ai/analyze', async (req, res) => {
     }
 
     // Get all snippets for analysis
-    const rows = db.prepare('SELECT * FROM snippets ORDER BY created_at DESC').all() as SnippetRow[];
-    const snippets: Snippet[] = rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      code: row.code,
-      language: row.language,
-      description: row.description || undefined,
-      tags: row.tags ? JSON.parse(row.tags) : [],
-      createdAt: row.created_at
+    const snippets = await snippetsCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const formattedSnippets = snippets.map(snippet => ({
+      id: snippet._id.toString(),
+      title: snippet.title,
+      code: snippet.code,
+      language: snippet.language,
+      description: snippet.description,
+      tags: snippet.tags || [],
+      createdAt: snippet.createdAt.toISOString()
     }));
 
     // Analyze similarity
-    const suggestions = analyzeSimilarity(code, snippets);
+    const suggestions = analyzeSimilarity(code, formattedSnippets);
     
     res.json({
       suggestions,
@@ -229,8 +405,32 @@ app.post('/api/ai/analyze', async (req, res) => {
   }
 });
 
-// Similarity analysis function
-function analyzeSimilarity(currentCode: string, snippets: Snippet[]): any[] {
+// Get all unique languages
+app.get('/api/languages', async (req, res) => {
+  try {
+    const languages = await snippetsCollection.distinct('language');
+    res.json(languages);
+  } catch (error) {
+    console.error('Error fetching languages:', error);
+    res.status(500).json({ error: 'Failed to fetch languages' });
+  }
+});
+
+// Get all unique tags
+app.get('/api/tags', async (req, res) => {
+  try {
+    const tags = await snippetsCollection.distinct('tags');
+    // Flatten and remove duplicates
+    const uniqueTags = [...new Set(tags.flat())];
+    res.json(uniqueTags);
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ error: 'Failed to fetch tags' });
+  }
+});
+
+// Similarity analysis functions
+function analyzeSimilarity(currentCode: string, snippets: any[]): any[] {
   const suggestions = [];
   
   for (const snippet of snippets) {
@@ -266,7 +466,7 @@ function tokenizeCode(code: string): string[] {
     .toLowerCase()
     .split(/[^\w]/)
     .filter(token => token.length > 2)
-    .filter(token => !['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return'].includes(token));
+    .filter(token => !['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return', 'class', 'import', 'export'].includes(token));
 }
 
 function getSimilarityReason(similarity: number): string {
@@ -295,5 +495,34 @@ function detectLanguage(code: string): string {
   if (code.includes('public class') || code.includes('void main')) return 'java';
   if (code.includes('#include') || code.includes('using namespace')) return 'cpp';
   if (code.includes('func ') && code.includes('package')) return 'go';
+  if (code.includes('<?php')) return 'php';
   return 'unknown';
 }
+
+// Start server
+async function startServer() {
+  await connectToDatabase();
+  
+  app.listen(PORT, () => {
+    console.log(`🚀 Code Vault server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`💾 Database: MongoDB Atlas - Cluster0`);
+    console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🗄️ Database: codevault.snippets`);
+  });
+}
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('Shutting down gracefully...');
+  await client.close();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('Shutting down gracefully...');
+  await client.close();
+  process.exit(0);
+});
+
+startServer().catch(console.error);
