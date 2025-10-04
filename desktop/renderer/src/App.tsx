@@ -439,7 +439,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Snippets Grid */}
+        {/* Snippets-Grid */}
         <div className="snippets-grid">
           {filteredSnippets.map(snippet => (
             <div key={snippet.id} className="snippet-card">
