@@ -1,8 +1,11 @@
 {
   "name": "code-vault-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI-powered code snippet manager and productivity tool",
-  "author": "graciari2000",
+  "author": {
+    "name": "graciari2000",
+    "email": "your-email@example.com"
+  },
   "private": true,
   "main": "dist/main.js",
   "homepage": "./",
@@ -13,65 +16,79 @@
     "build": "npm run build:renderer && npm run build:main && electron-builder",
     "build:renderer": "cd renderer && vite build",
     "build:main": "tsc -p tsconfig.main.json",
+    "prebuild": "npm run build:renderer && npm run build:main",
     "start": "electron .",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "build": {
     "appId": "com.codevault.desktop",
     "productName": "Code Vault",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "assets"
     },
     "files": [
       "dist/**/*",
       "renderer/dist/**/*",
       "package.json",
-      "node_modules/**/*"
+      "!**/*.map",
+      "!renderer/src/**/*",
+      "!renderer/*.config.*",
+      "!**/.vscode",
+      "!*.log",
+      "!README.md",
+      "!.gitignore"
     ],
-    "extraFiles": [
+    "extraResources": [
       {
-        "from": "node_modules/ffmpeg-static/bin/win32/ffmpeg.exe",
-        "to": "ffmpeg.exe",
-        "filter": [
-          "**/*"
-        ]
+        "from": "renderer/dist",
+        "to": "renderer/dist",
+        "filter": ["**/*"]
       }
     ],
+    "asar": true,
+    "compression": "maximum",
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
       ],
-      "icon": "assets/icon.ico"
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "assets/icon.icns"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.ico",
+      "publisherName": "graciari2000"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "shortcutName": "Code Vault"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "graciari2000",
-        "repo": "code-vault-desktop"
-      }
-    ]
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Development"
+    }
   },
   "dependencies": {
     "axios": "^1.4.0",
