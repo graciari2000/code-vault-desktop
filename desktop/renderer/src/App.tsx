@@ -69,7 +69,7 @@ export default function App() {
 
   const loadSnippets = async () => {
     try {
-      const res = await axios.get('http://localhost:8802/api/snippets')
+      const res = await axios.get('https://code-vault-desktop.onrender.com/api/snippets')
       setSnippets(res.data)
     } catch (error) {
       console.error('Failed to load snippets:', error)
@@ -86,7 +86,7 @@ export default function App() {
     setIsAnalyzing(true)
     try {
       // Try server-side AI analysis first
-      const response = await axios.post('http://localhost:8802/api/ai/analyze', {
+      const response = await axios.post('https://code-vault-desktop.onrender.com/api/ai/analyze', {
         code,
         language: 'auto'
       })
@@ -227,7 +227,7 @@ export default function App() {
         id: Date.now().toString(),
         createdAt: new Date().toISOString()
       }
-      const res = await axios.post('http://localhost:8802/api/snippets', snippetToAdd)
+      const res = await axios.post('https://code-vault-desktop.onrender.com/api/snippets', snippetToAdd)
       setSnippets(prev => [...prev, res.data])
       setShowAddForm(false)
       setNewSnippet({
