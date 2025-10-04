@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { MongoClient, ObjectId, ServerApiVersion } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,6 +21,35 @@ const client = new MongoClient(MONGODB_URI, {
 // Database and collection references
 let db: any;
 let snippetsCollection: any;
+
+// Interface definitions
+interface Snippet {
+  id: string;
+  title: string;
+  code: string;
+  language: string;
+  description?: string;
+  tags: string[];
+  createdAt: string;
+}
+
+interface SnippetDocument {
+  _id: ObjectId;
+  title: string;
+  code: string;
+  language: string;
+  description?: string;
+  tags: string[];
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+interface AISuggestion {
+  snippet: Snippet;
+  reason: string;
+  confidence: number;
+  context: string;
+}
 
 // Connect to MongoDB
 async function connectToDatabase() {
@@ -49,7 +78,7 @@ async function connectToDatabase() {
 
 // Insert sample data
 async function insertSampleData() {
-  const sampleSnippets = [
+  const sampleSnippets: SnippetDocument[] = [
     {
       _id: new ObjectId(),
       title: 'React Hook Form Setup',
@@ -108,7 +137,7 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', async (req: Request, res: Response) => {
   try {
     // Test database connection
     await db.command({ ping: 1 });
@@ -121,7 +150,7 @@ app.get('/api/health', async (req, res) => {
       totalSnippets: snippetCount,
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ 
       status: 'Error', 
       message: 'Database connection failed',
@@ -131,14 +160,14 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Get all snippets
-app.get('/api/snippets', async (req, res) => {
+app.get('/api/snippets', async (req: Request, res: Response) => {
   try {
     const { search, language, tag, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     
-    let query = {};
+    let query: any = {};
     
     // Search across multiple fields
-    if (search) {
+    if (search && typeof search === 'string') {
       query = {
         $or: [
           { title: { $regex: search, $options: 'i' } },
@@ -150,12 +179,12 @@ app.get('/api/snippets', async (req, res) => {
     }
     
     // Filter by language
-    if (language && language !== 'all') {
+    if (language && language !== 'all' && typeof language === 'string') {
       query.language = language;
     }
     
     // Filter by tag
-    if (tag && tag !== 'all') {
+    if (tag && tag !== 'all' && typeof tag === 'string') {
       query.tags = tag;
     }
     
@@ -169,7 +198,7 @@ app.get('/api/snippets', async (req, res) => {
       .toArray();
     
     // Convert MongoDB _id to id for frontend compatibility
-    const formattedSnippets = snippets.map(snippet => ({
+    const formattedSnippets: Snippet[] = snippets.map((snippet: SnippetDocument) => ({
       id: snippet._id.toString(),
       title: snippet.title,
       code: snippet.code,
@@ -180,14 +209,14 @@ app.get('/api/snippets', async (req, res) => {
     }));
     
     res.json(formattedSnippets);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching snippets:', error);
     res.status(500).json({ error: 'Failed to fetch snippets' });
   }
 });
 
 // Get single snippet by ID
-app.get('/api/snippets/:id', async (req, res) => {
+app.get('/api/snippets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -202,7 +231,7 @@ app.get('/api/snippets/:id', async (req, res) => {
     }
     
     // Convert MongoDB _id to id
-    const formattedSnippet = {
+    const formattedSnippet: Snippet = {
       id: snippet._id.toString(),
       title: snippet.title,
       code: snippet.code,
@@ -213,14 +242,14 @@ app.get('/api/snippets/:id', async (req, res) => {
     };
     
     res.json(formattedSnippet);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching snippet:', error);
     res.status(500).json({ error: 'Failed to fetch snippet' });
   }
 });
 
 // Create new snippet
-app.post('/api/snippets', async (req, res) => {
+app.post('/api/snippets', async (req: Request, res: Response) => {
   try {
     const { title, code, language, description, tags } = req.body;
     
@@ -228,7 +257,8 @@ app.post('/api/snippets', async (req, res) => {
       return res.status(400).json({ error: 'Title, code, and language are required' });
     }
     
-    const newSnippet = {
+    const newSnippet: SnippetDocument = {
+      _id: new ObjectId(),
       title,
       code,
       language,
@@ -239,21 +269,25 @@ app.post('/api/snippets', async (req, res) => {
     
     const result = await snippetsCollection.insertOne(newSnippet);
     
-    const createdSnippet = {
+    const createdSnippet: Snippet = {
       id: result.insertedId.toString(),
-      ...newSnippet,
+      title: newSnippet.title,
+      code: newSnippet.code,
+      language: newSnippet.language,
+      description: newSnippet.description,
+      tags: newSnippet.tags,
       createdAt: newSnippet.createdAt.toISOString()
     };
     
     res.status(201).json(createdSnippet);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating snippet:', error);
     res.status(500).json({ error: 'Failed to create snippet' });
   }
 });
 
 // Update snippet
-app.put('/api/snippets/:id', async (req, res) => {
+app.put('/api/snippets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { title, code, language, description, tags } = req.body;
@@ -286,7 +320,7 @@ app.put('/api/snippets/:id', async (req, res) => {
     
     const updatedSnippet = await snippetsCollection.findOne({ _id: new ObjectId(id) });
     
-    res.json({
+    const formattedSnippet: Snippet = {
       id: updatedSnippet._id.toString(),
       title: updatedSnippet.title,
       code: updatedSnippet.code,
@@ -294,15 +328,17 @@ app.put('/api/snippets/:id', async (req, res) => {
       description: updatedSnippet.description,
       tags: updatedSnippet.tags,
       createdAt: updatedSnippet.createdAt.toISOString()
-    });
-  } catch (error) {
+    };
+    
+    res.json(formattedSnippet);
+  } catch (error: any) {
     console.error('Error updating snippet:', error);
     res.status(500).json({ error: 'Failed to update snippet' });
   }
 });
 
 // Delete snippet
-app.delete('/api/snippets/:id', async (req, res) => {
+app.delete('/api/snippets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -317,14 +353,14 @@ app.delete('/api/snippets/:id', async (req, res) => {
     }
     
     res.json({ message: 'Snippet deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting snippet:', error);
     res.status(500).json({ error: 'Failed to delete snippet' });
   }
 });
 
 // Search snippets
-app.get('/api/snippets/search', async (req, res) => {
+app.get('/api/snippets/search', async (req: Request, res: Response) => {
   try {
     const { q } = req.query;
     
@@ -346,7 +382,7 @@ app.get('/api/snippets/search', async (req, res) => {
       .sort({ createdAt: -1 })
       .toArray();
     
-    const formattedSnippets = snippets.map(snippet => ({
+    const formattedSnippets: Snippet[] = snippets.map((snippet: SnippetDocument) => ({
       id: snippet._id.toString(),
       title: snippet.title,
       code: snippet.code,
@@ -357,14 +393,14 @@ app.get('/api/snippets/search', async (req, res) => {
     }));
     
     res.json(formattedSnippets);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error searching snippets:', error);
     res.status(500).json({ error: 'Failed to search snippets' });
   }
 });
 
 // AI Analysis endpoint
-app.post('/api/ai/analyze', async (req, res) => {
+app.post('/api/ai/analyze', async (req: Request, res: Response) => {
   try {
     const { code, language } = req.body;
     
@@ -378,7 +414,7 @@ app.post('/api/ai/analyze', async (req, res) => {
       .sort({ createdAt: -1 })
       .toArray();
 
-    const formattedSnippets = snippets.map(snippet => ({
+    const formattedSnippets: Snippet[] = snippets.map((snippet: SnippetDocument) => ({
       id: snippet._id.toString(),
       title: snippet.title,
       code: snippet.code,
@@ -399,39 +435,39 @@ app.post('/api/ai/analyze', async (req, res) => {
         language: detectLanguage(code)
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('AI analysis error:', error);
     res.status(500).json({ error: 'Analysis failed' });
   }
 });
 
 // Get all unique languages
-app.get('/api/languages', async (req, res) => {
+app.get('/api/languages', async (req: Request, res: Response) => {
   try {
     const languages = await snippetsCollection.distinct('language');
     res.json(languages);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching languages:', error);
     res.status(500).json({ error: 'Failed to fetch languages' });
   }
 });
 
 // Get all unique tags
-app.get('/api/tags', async (req, res) => {
+app.get('/api/tags', async (req: Request, res: Response) => {
   try {
     const tags = await snippetsCollection.distinct('tags');
     // Flatten and remove duplicates
     const uniqueTags = [...new Set(tags.flat())];
     res.json(uniqueTags);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching tags:', error);
     res.status(500).json({ error: 'Failed to fetch tags' });
   }
 });
 
 // Similarity analysis functions
-function analyzeSimilarity(currentCode: string, snippets: any[]): any[] {
-  const suggestions = [];
+function analyzeSimilarity(currentCode: string, snippets: Snippet[]): AISuggestion[] {
+  const suggestions: AISuggestion[] = [];
   
   for (const snippet of snippets) {
     const similarity = calculateSimilarity(currentCode, snippet.code);
