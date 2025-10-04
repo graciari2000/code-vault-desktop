@@ -114,15 +114,17 @@ async function insertSampleData() {
   }
 }
 
-// Middleware
+// Middleware - FIXED CORS CONFIGURATION
 app.use(cors({
-  origin: [
-    'https://code-vault-desktop.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
-  credentials: true
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
 // Health check
@@ -147,7 +149,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
   }
 });
 
-// Get all snippets
+// Get all snippets - FIXED RESPONSE FORMAT
 app.get('/api/snippets', async (req: Request, res: Response) => {
   try {
     const { search, language, tag, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
@@ -196,6 +198,7 @@ app.get('/api/snippets', async (req: Request, res: Response) => {
       createdAt: snippet.createdAt.toISOString()
     }));
     
+    // RETURN JUST THE ARRAY, not an object with status
     res.json(formattedSnippets);
   } catch (error: any) {
     console.error('Error fetching snippets:', error);
@@ -533,6 +536,7 @@ async function startServer() {
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`💾 Database: MongoDB Atlas`);
       console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🔧 CORS enabled for all origins`);
     });
   } catch (error: any) {
     console.error('❌ Failed to start server:', error.message);

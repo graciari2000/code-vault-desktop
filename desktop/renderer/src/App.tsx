@@ -3,15 +3,8 @@ import axios from 'axios'
 import { Search, Plus, Moon, Sun, Code, Tag, Calendar, Brain, Sparkles, Zap, Copy, X } from 'lucide-react'
 import './styles.css'
 
-// Use Vite environment variables for API configuration
+// API configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://code-vault-desktop.onrender.com';
-
-// Debug info
-console.log('🚀 Frontend Configuration:');
-console.log('Hostname:', window.location.hostname);
-console.log('API Base URL:', API_BASE_URL);
-console.log('Environment Mode:', import.meta.env.MODE);
-console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
 
 interface Snippet {
   id: string
@@ -51,6 +44,7 @@ export default function App() {
   const [currentCode, setCurrentCode] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(true)
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking')
   const [newSnippet, setNewSnippet] = useState<NewSnippet>({
     title: '',
     code: '',
@@ -63,12 +57,10 @@ export default function App() {
   const allTags = ['all', 'algorithm', 'utility', 'api', 'database', 'ui', 'authentication', 'auto-captured', 'vscode']
 
   useEffect(() => {
+    checkBackendStatus()
     loadSnippets()
     const savedTheme = localStorage.getItem('theme')
     setIsDark(savedTheme === 'dark')
-
-    // Test server connection
-    testConnection()
   }, [])
 
   useEffect(() => {
@@ -80,22 +72,83 @@ export default function App() {
     filterSnippets()
   }, [snippets, query, selectedLanguage, selectedTag])
 
-  const testConnection = async () => {
+  const checkBackendStatus = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/health`)
-      console.log('Server connection successful:', res.data)
+      await axios.get(`${API_BASE_URL}/api/health`)
+      setBackendStatus('online')
     } catch (error) {
-      console.error('Cannot connect to server:', error)
-      alert(`Cannot connect to server at ${API_BASE_URL}. Please make sure the backend is running.`)
+      console.error('Backend is offline:', error)
+      setBackendStatus('offline')
     }
   }
 
   const loadSnippets = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/snippets`)
-      setSnippets(res.data)
+
+      // Handle the actual response format from backend
+      let snippetsData = res.data
+
+      // If response is a string, try to parse it as JSON
+      if (typeof snippetsData === 'string') {
+        try {
+          snippetsData = JSON.parse(snippetsData)
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', parseError)
+        }
+      }
+
+      // Extract snippets array from the response
+      if (Array.isArray(snippetsData)) {
+        // Direct array response
+        setSnippets(snippetsData)
+      } else if (snippetsData && Array.isArray(snippetsData.data)) {
+        // Nested in data property
+        setSnippets(snippetsData.data)
+      } else if (snippetsData && Array.isArray(snippetsData.snippets)) {
+        // Nested in snippets property
+        setSnippets(snippetsData.snippets)
+      } else {
+        // Try to find array in response object
+        const arrayKey = Object.keys(snippetsData).find(key =>
+          Array.isArray(snippetsData[key]) &&
+          snippetsData[key].length > 0 &&
+          snippetsData[key][0].id &&
+          snippetsData[key][0].title
+        )
+        if (arrayKey) {
+          setSnippets(snippetsData[arrayKey])
+        } else {
+          throw new Error('No snippets array found in response')
+        }
+      }
+
+      setBackendStatus('online')
     } catch (error) {
       console.error('Failed to load snippets:', error)
+      setBackendStatus('offline')
+
+      // Load sample data for demo purposes
+      setSnippets([
+        {
+          id: '1',
+          title: 'React Hook Form Setup',
+          code: 'const { register, handleSubmit, formState: { errors } } = useForm();\nconst onSubmit = data => console.log(data);',
+          language: 'typescript',
+          tags: ['react', 'form', 'hook'],
+          createdAt: new Date().toISOString(),
+          description: 'Basic setup for React Hook Form with TypeScript'
+        },
+        {
+          id: '2',
+          title: 'API Fetch Wrapper',
+          code: 'async function apiFetch(url, options = {}) {\n  const response = await fetch(url, {\n    headers: { \'Content-Type\': \'application/json\' },\n    ...options\n  });\n  return response.json();\n}',
+          language: 'javascript',
+          tags: ['api', 'utility', 'http'],
+          createdAt: new Date().toISOString(),
+          description: 'Generic fetch wrapper for API calls'
+        }
+      ])
     }
   }
 
@@ -108,14 +161,19 @@ export default function App() {
 
     setIsAnalyzing(true)
     try {
-      // Try server-side AI analysis first
-      const response = await axios.post(`${API_BASE_URL}/api/ai/analyze`, {
-        code,
-        language: 'auto'
-      })
+      if (backendStatus === 'online') {
+        // Try server-side AI analysis first
+        const response = await axios.post(`${API_BASE_URL}/api/ai/analyze`, {
+          code,
+          language: 'auto'
+        })
 
-      setAiSuggestions(response.data.suggestions || [])
-      setShowAIPanel(true)
+        setAiSuggestions(response.data.suggestions || [])
+        setShowAIPanel(true)
+      } else {
+        // Fallback to local similarity analysis
+        performLocalAnalysis(code)
+      }
     } catch (error) {
       console.error('AI analysis failed, using local analysis:', error)
       // Fallback to local similarity analysis
@@ -123,7 +181,7 @@ export default function App() {
     } finally {
       setIsAnalyzing(false)
     }
-  }, [snippets])
+  }, [snippets, backendStatus])
 
   const performLocalAnalysis = (code: string) => {
     const suggestions: AISuggestion[] = []
@@ -250,8 +308,15 @@ export default function App() {
         id: Date.now().toString(),
         createdAt: new Date().toISOString()
       }
-      const res = await axios.post(`${API_BASE_URL}/api/snippets`, snippetToAdd)
-      setSnippets(prev => [...prev, res.data])
+
+      if (backendStatus === 'online') {
+        const res = await axios.post(`${API_BASE_URL}/api/snippets`, snippetToAdd)
+        setSnippets(prev => [...prev, res.data])
+      } else {
+        // Add locally if backend is offline
+        setSnippets(prev => [...prev, snippetToAdd])
+      }
+
       setShowAddForm(false)
       setNewSnippet({
         title: '',
@@ -260,11 +325,25 @@ export default function App() {
         tags: [],
         description: ''
       })
-      // Reload snippets to include the new one
-      loadSnippets()
     } catch (error) {
       console.error('Failed to add snippet:', error)
-      alert('Failed to add snippet. Make sure the server is running.')
+      alert('Backend is unavailable. Snippet saved locally only.')
+
+      // Fallback: save locally
+      const snippetToAdd = {
+        ...newSnippet,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      }
+      setSnippets(prev => [...prev, snippetToAdd])
+      setShowAddForm(false)
+      setNewSnippet({
+        title: '',
+        code: '',
+        language: 'javascript',
+        tags: [],
+        description: ''
+      })
     }
   }
 
@@ -293,6 +372,13 @@ export default function App() {
             <span className="ai-badge">AI Powered</span>
           </div>
           <div className="header-actions">
+            <div className="backend-status">
+              <div className={`status-indicator ${backendStatus}`}>
+                {backendStatus === 'online' && '🟢 Backend Online'}
+                {backendStatus === 'offline' && '🔴 Backend Offline'}
+                {backendStatus === 'checking' && '🟡 Checking...'}
+              </div>
+            </div>
             <button
               className="icon-btn"
               onClick={() => setIsDark(!isDark)}
@@ -310,6 +396,13 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Backend Status Warning */}
+      {backendStatus === 'offline' && (
+        <div className="offline-warning">
+          <p>⚠️ Backend server is offline. Snippets are stored locally only and will not be saved to the cloud.</p>
+        </div>
+      )}
 
       <main className="main-content">
         {/* AI Analysis Panel */}
@@ -462,7 +555,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Snippets-Grid */}
+        {/* Snippets Grid */}
         <div className="snippets-grid">
           {filteredSnippets.map(snippet => (
             <div key={snippet.id} className="snippet-card">
