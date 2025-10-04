@@ -9,6 +9,12 @@ const PORT = process.env.PORT || 8802;
 // MongoDB Atlas connection - use environment variable in production
 const MONGODB_URI = process.env.MONGODB_URI;
 
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is required');
+  console.error('💡 Please set MONGODB_URI in your environment variables');
+  process.exit(1);
+}
+
 // MongoDB client setup with proper TLS configuration
 const client = new MongoClient(MONGODB_URI, {
   serverApi: {
