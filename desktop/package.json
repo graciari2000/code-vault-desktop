@@ -58,7 +58,7 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.ico",
+      "icon": "assets/code vault logo.ico",
       "publisherName": "graciari2000"
     },
     "nsis": {
@@ -76,7 +76,7 @@
           "arch": ["x64", "arm64"]
         }
       ],
-      "icon": "assets/icon.icns",
+      "icon": "assets/code vault logo.icns",
       "category": "public.app-category.developer-tools"
     },
     "linux": {
@@ -86,7 +86,7 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.png",
+      "icon": "assets/code vault logo.png",
       "category": "Development"
     }
   },
